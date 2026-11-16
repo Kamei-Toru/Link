@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Mirror visible regular files as symbolic links.
+# Version: 1.1
+# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET PIPE_FAIL
 unsetopt GLOB_DOTS

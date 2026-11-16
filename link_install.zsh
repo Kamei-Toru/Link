@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Install the package; preserve user configuration and back up changed files.
+# Version: 1.1
+# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET
 error() { print -ru2 -- "Error: $1"; }

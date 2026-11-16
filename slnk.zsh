@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Link scripts by configured extensions; never evaluate configuration as code.
+# Version: 1.1
+# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET EXTENDED_GLOB
 unsetopt GLOB_DOTS
