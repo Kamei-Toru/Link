@@ -1,7 +1,24 @@
-# Link and Slnk
+# Link and Slnk — Version 1.2b
 
 Create symbolic links to visible regular files while preserving source subdirectory
 structure. Dotfiles and dot-directories, including `.git`, are excluded at every depth.
+
+## Version information
+
+All three zsh scripts are Version 1.2b, recorded in their header comments and
+version constants. Both flags exit successfully without performing any work:
+
+```zsh
+./Link/link.zsh -v
+./Link/slnk.zsh --version
+zsh ./Link/link_install.zsh --version
+```
+
+`link_install.zsh` replaces the previous installer name to avoid collisions with
+other projects. The package no longer contains `install.zsh`. An old installer
+already in your repository is left untouched; remove it yourself if no longer
+needed. The new installer is stored in `~/Projects/Link/` but only the link and
+slnk command links are created in `~/Link/`.
 
 ## Requirements
 
@@ -53,7 +70,8 @@ have a dot-prefixed name; hidden descendants remain excluded.
 | Link resolving to any regular file inside SOURCE | Skip, even if it points to another source file |
 | Link resolving outside SOURCE | Replace |
 | Broken link or link resolving to a directory | Replace |
-| Non-link file, directory, or other entry | Error; preserve the entry |
+| Regular file | Back up beside the file inside DESTINATION as NAME.yyyymmdd[.N], then create the link |
+| Directory or special file | Error; preserve the entry |
 
 Containment uses resolved absolute paths and directory boundaries. Relative links
 are resolved relative to their containing directory. Source and destination trees
@@ -96,10 +114,10 @@ Executable permission is not required. Extensions are matched case-insensitively
 From the extracted package's parent directory, run:
 
 ```zsh
-zsh ./Link/install.zsh
+zsh ./Link/link_install.zsh
 ```
 
-This installs `link.zsh`, `slnk.zsh`, `slnk.conf`, and this merged `README.md` in
+This installs `link.zsh`, `slnk.zsh`, `link_install.zsh`, `slnk.conf`, and this merged `README.md` in
 `~/Projects/Link/`. It creates `~/Link/link.zsh` and `~/Link/slnk.zsh` as symbolic
 links to those scripts. Changed installed files are backed up with `.yyyymmdd`, then `.yyyymmdd.1`,
 `.2`, etc. An existing `slnk.conf` is preserved; packaged defaults are written
@@ -183,6 +201,7 @@ before creating directories. Explicit roots may resolve through symbolic links.
 | 1 | One or more source, conflict, or filesystem errors |
 | 2 | Invalid arguments or configuration |
 
+Both link and slnk skip backup names reserved for source-derived link targets.
 The created count includes updated links and links replacing backed-up files.
 Slnk removes dangling visible links directly inside each configured destination
 after a fully successful link phase. It does not recurse or remove hidden links,
@@ -206,7 +225,7 @@ The combined packages include Python standard-library regression tests. From the
 `Link` directory, run:
 
 ```sh
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s test -v
 ```
 
 The tests use temporary directories and an isolated HOME. They cover file/link
@@ -222,7 +241,7 @@ files and README; tests and review notes remain in the downloaded package.
 Extract `Link.zip` and run:
 
 ```zsh
-zsh ./Link/install.zsh
+zsh ./Link/link_install.zsh
 ```
 
 The complete package contains both scripts, configuration, shared README,
@@ -231,3 +250,46 @@ Existing custom configuration is preserved during installation.
 Broken-link cleanup is automatic after a successful run: link.zsh scans visible
 entries recursively, and slnk.zsh scans visible entries directly inside each
 configured destination. Earlier errors skip cleanup. Each deletion is logged.
+
+
+## Link regular-file backups (Version 1.2b)
+
+If `DESTINATION/sub/file` is a real regular file, link moves it to
+`DESTINATION/sub/file.yyyymmdd` before creating the symbolic link. If occupied,
+it tries `.yyyymmdd.1`, `.yyyymmdd.2`, and so on. Thus backups stay inside the
+second argument's directory and retain their corresponding parent directories.
+Existing files and links at backup names are not overwritten. Directories and
+special files are never converted to links. If link creation fails, restoration
+of the original file is attempted while the target is still absent. Earlier
+successful operations are not rolled back. Dates use the local machine date.
+
+## Tracked .zshrc updates (Version 1.2b)
+
+The default installation does not change `.zshrc` or PATH. To explicitly install
+new `.zshrc` contents supplied in a separate file, run:
+
+```zsh
+zsh ./Link/link_install.zsh --update-zshrc /absolute/path/to/new-zshrc
+```
+
+This option requires `~/.zshrc` to be a symbolic link resolving exactly to the
+real, readable `~/Projects/Dotfiles/.zshrc`. The real file must not itself be a
+symbolic link. These conditions are checked before installation changes.
+
+Before replacing the tracked file, the installer copies its original contents
+to a **regular backup file** `~/.zshrc.yyyymmdd`, adding `.1`, `.2`, etc. when
+necessary. It verifies the backup, preserves the tracked file's permissions,
+and updates `~/Projects/Dotfiles/.zshrc` via a staged rename. The `~/.zshrc`
+symbolic link is preserved. Identical content is skipped without creating a
+backup. No Git commit or push is performed. Review the tracked file in your
+Dotfiles repository before committing it. A failed final rename preserves the
+original tracked file and retains the backup. Earlier installation changes are
+not rolled back if the optional update subsequently fails.
+
+## Version 1.2b validation
+
+28 regression tests pass on macOS, including both version options for every
+zsh script, link regular-file backup numbering and recovery, reserved backup
+names, .zshrc backup numbering, preserved permissions and symlink identity,
+rejection of an unexpected dotfile layout, and simulated update failure.
+The GNU/Linux branch has not been executed in this environment.

@@ -1,4 +1,4 @@
-# Script review
+# Script review — Version 1.2b
 
 ## Changes
 
@@ -11,7 +11,7 @@
 | Copy failure could occur after moving the installed file aside | Stage the copy first; attempt restoration after a failed final move |
 | Empty configuration tokens could be lost during splitting | Validate exact separator count, explicit fields, and empty extension tokens |
 | Recursive globbing could silently skip inaccessible source directories | Check source and visible subdirectory access before linking |
-| No reusable regression suite was included | Include 19 standard-library tests, including deliberate ln/mv failures |
+| No reusable regression suite was included | Include 28 standard-library tests, including deliberate ln/mv failures |
 
 The original behavior remains: link preserves subdirectory structure and excludes
 hidden descendants; slnk scans directly inside multiple source directories and
@@ -21,8 +21,8 @@ replaced by slnk.
 
 ## Validation
 
-- zsh syntax checks for link.zsh, slnk.zsh, and install.zsh.
-- 19 regression tests passed on macOS using zsh.
+- zsh syntax checks for link.zsh, slnk.zsh, and link_install.zsh.
+- 28 regression tests passed on macOS using zsh.
 - Existing integration checks for configurable languages, backup numbering,
   missing-source continuation, and isolated installation also passed.
 - ZIP integrity and folder layout verified before delivery.
@@ -50,3 +50,25 @@ each configured destination directly, deduplicating shared destination paths.
 Earlier errors skip cleanup. Cleanup failure sets exit status 1. Tests verify
 scope, hidden-entry exclusion, normal file/link preservation, missing-source
 behavior, and injected unlink failure. Regular dated backups are retained.
+
+
+## Version 1.2b re-review
+
+Reviewed all three zsh scripts after the changes, including failure paths.
+
+| Script | Version 1.2b changes and review |
+| --- | --- |
+| link.zsh | Adds version flags, dated numbered regular-file backups, restoration on link-creation failure, and avoidance of planned link names when choosing backup paths |
+| slnk.zsh | Adds version flags and reserves planned destination names before selecting backups; existing language routing, cleanup and failure behavior retained |
+| link_install.zsh | Renames the installer, adds version flags, installs itself in the repository, preserves configuration, and supports an explicit tracked-dotfile update without replacing the home symlink |
+
+Both version options return before configuration, installation, linking or
+cleanup. The dotfile option is opt-in: default installation leaves .zshrc alone.
+Tests use isolated HOME directories; the actual user's .zshrc was not modified.
+The dotfile backup is a verified regular copy under HOME, not a moved home link.
+Its date/suffix selection handles existing files and dangling symbolic links.
+A staged rename retains the old tracked file on simulated mv failure.
+
+The 28-test suite and syntax checks passed on macOS. GNU/Linux behavior remains
+unexecuted here. Concurrency, abrupt termination and non-transactional multi-file
+updates remain the limitations described above.

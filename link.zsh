@@ -1,10 +1,10 @@
 #!/bin/zsh
+# Version: 1.2b
 # Mirror visible regular files as symbolic links.
-# Version: 1.1
-# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET PIPE_FAIL
 unsetopt GLOB_DOTS
+readonly SCRIPT_VERSION='1.2b'
 usage() {
   cat <<'HELP'
 link.zsh - Link visible source files, preserving subdirectory structure.
@@ -19,13 +19,15 @@ Arguments:
 
 Options:
   -h, --help   Display help and exit.
+  -v, --version  Display Version 1.2b and exit.
   --           Allow a source path beginning with a dash.
 
 Behavior:
   Preserve relative paths and basenames; use absolute link targets.
   Exclude dotfiles, dot-directories (including .git), and source symlinks.
   Keep links resolving to any regular file inside SOURCE; replace other links.
-  Never overwrite non-link entries or follow destination parent symlinks.
+  Back up existing regular files as NAME.yyyymmdd[.N] before linking.
+  Preserve directories/special files; never follow destination parent symlinks.
   Source and destination must be separate, non-overlapping directory trees.
   After successful linking, remove dangling visible links recursively in DESTINATION.
   Hidden entries and symlinked directory contents are excluded from cleanup.
@@ -46,6 +48,9 @@ Errors are written to standard error.
 HELP
 }
 error() { print -ru2 -- "Error: $1"; }
+if (( $# == 1 )) && [[ $1 == -v || $1 == --version ]]; then
+  print -r -- "link.zsh Version $SCRIPT_VERSION"; exit 0
+fi
 if (( $# == 1 )) && [[ $1 == -h || $1 == --help || $1 == '—help' ]]; then
   usage; exit 0
 fi
@@ -91,12 +96,14 @@ check_parents() {
   done
   return 0
 }
+typeset -A planned_targets
 for file in "${files[@]}"; do
   relative=${file#"$source_dir/"}
   check_parents "$relative" || exit 1
   target="$destination/$relative"
-  if [[ ! -L $target && -e $target ]]; then
-    error "Destination entry exists and is not a symbolic link: $target"; exit 1
+  planned_targets[$target]=1
+  if [[ ! -L $target && -e $target && ! -f $target ]]; then
+    error "Destination entry is a directory or special file: $target"; exit 1
   fi
 done
 if ! command mkdir -p -- "$destination"; then
@@ -122,7 +129,8 @@ replace_link() {
   }
 }
 
-integer created=0 skipped=0 replaced=0
+date_stamp=$(command date +%Y%m%d) || { error 'Cannot determine backup date.'; exit 1; }
+integer created=0 skipped=0 replaced=0 backed_up=0
 for file in "${files[@]}"; do
   relative=${file#"$source_dir/"}
   target="$destination/$relative"
@@ -130,6 +138,7 @@ for file in "${files[@]}"; do
   if ! command mkdir -p -- "${target:h}"; then
     error "Cannot create destination subdirectory: ${target:h}"; exit 1
   fi
+  backup=
   if [[ -L $target ]]; then
     resolved=${target:A}
     if [[ -f $resolved ]] && within "$resolved" "$source_dir"; then
@@ -139,11 +148,28 @@ for file in "${files[@]}"; do
       error "Cannot replace symbolic link: $target"; exit 1
     fi
     (( replaced += 1 )); (( created += 1 )); continue
+  elif [[ -f $target ]]; then
+    backup="$target.$date_stamp"; integer suffix=0
+    while [[ -e $backup || -L $backup ]] || (( ${+planned_targets[$backup]} )); do
+      (( suffix += 1 )); backup="$target.$date_stamp.$suffix"
+    done
+    if ! command mv -n -- "$target" "$backup" || [[ -e $target || -L $target ]]; then
+      error "Cannot back up file: $target"; exit 1
+    fi
+    (( backed_up += 1 )); print -r -- "Backup: $backup"
   elif [[ -e $target ]]; then
-    error "Destination entry already exists: $target"; exit 1
+    error "Destination is a directory or special file: $target"; exit 1
   fi
   if ! command ln -s -- "$file" "$target"; then
-    error "Cannot create symbolic link: $target"; exit 1
+    error "Cannot create symbolic link: $target"
+    if [[ -n $backup && ! -e $target && ! -L $target ]]; then
+      if command mv -n -- "$backup" "$target" && [[ ! -e $backup && ! -L $backup ]]; then
+        print -ru2 -- "Restored original file: $target"
+      else
+        error "Restore failed; original file retained at: $backup"
+      fi
+    fi
+    exit 1
   fi
   (( created += 1 ))
 done
@@ -165,5 +191,5 @@ for candidate in "$destination"/**/*(N@); do
     fi
   fi
 done
-print -r -- "Done: $created link(s) created ($replaced replaced), $skipped skipped, $removed broken link(s) removed."
+print -r -- "Done: $created link(s) created ($replaced replaced), $skipped skipped, $backed_up file(s) backed up, $removed broken link(s) removed."
 exit $cleanup_failed

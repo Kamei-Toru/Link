@@ -1,28 +1,53 @@
 #!/bin/zsh
+# Version: 1.2b
 # Install the package; preserve user configuration and back up changed files.
-# Version: 1.1
-# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET
+readonly SCRIPT_VERSION='1.2b'
 error() { print -ru2 -- "Error: $1"; }
-if (( $# )); then
-  if (( $# == 1 )) && [[ $1 == -h || $1 == --help ]]; then
-    print -r -- 'Usage: zsh install.zsh
+zshrc_input=
+while (( $# )); do
+  case $1 in
+    -v|--version) print -r -- "link_install.zsh Version $SCRIPT_VERSION"; exit 0 ;;
+    -h|--help)
+      print -r -- 'link_install.zsh — Version 1.2b
+Usage: zsh link_install.zsh [--update-zshrc FILE]
+  -h, --help             Display help.
+  -v, --version          Display the script version.
+  --update-zshrc FILE    Explicitly replace the tracked .zshrc with FILE contents.
 Install scripts in ~/Projects/Link and command links in ~/Link.
-Existing slnk.conf is preserved; packaged defaults go to slnk.conf.example.
+Existing slnk.conf is preserved; defaults go to slnk.conf.example.
 Changed files are backed up as NAME.yyyymmdd[.N].
-Exit status: 0 success/help; 1 filesystem error; 2 invalid arguments.
+By default .zshrc is untouched. The optional update requires ~/.zshrc to resolve
+exactly to ~/Projects/Dotfiles/.zshrc. Its real contents are copied to a regular
+backup ~/.zshrc.yyyymmdd[.N]; the tracked file is updated and the link is kept.
+Exit status: 0 success/help/version; 1 filesystem error; 2 invalid arguments.
 Do not modify installation directories concurrently.'
-    exit 0
-  fi
-  error 'Unexpected arguments. Use --help.'; exit 2
-fi
+      exit 0 ;;
+    --update-zshrc)
+      if (( $# < 2 )) || [[ -z $2 || -n $zshrc_input ]]; then
+        error 'Specify --update-zshrc FILE at most once.'; exit 2
+      fi
+      zshrc_input=${2:A}; shift 2 ;;
+    *) error "Unexpected argument: $1. Use --help."; exit 2 ;;
+  esac
+done
 root=${0:A:h}
 repo="$HOME/Projects/Link"
 links="$HOME/Link"
 stamp=$(command date +%Y%m%d) || exit 1
+# Validate an explicitly requested dotfile update before installation changes.
+zshrc="$HOME/Projects/Dotfiles/.zshrc"
+home_zshrc="$HOME/.zshrc"
+if [[ -n $zshrc_input ]]; then
+  if [[ ! -f $zshrc_input || ! -r $zshrc_input || ! -f $zshrc || ! -r $zshrc || -L $zshrc ||
+        ! -L "$HOME/.zshrc" || ${home_zshrc:A} != ${zshrc:A} ]]; then
+    error 'The .zshrc update requires readable input, a real ~/Projects/Dotfiles/.zshrc, and ~/.zshrc linked to it.'
+    exit 1
+  fi
+fi
 # Check all package files and destination types before making changes.
-for name in link.zsh slnk.zsh slnk.conf README.md; do
+for name in link.zsh slnk.zsh link_install.zsh slnk.conf README.md; do
   if [[ ! -f "$root/$name" || ! -r "$root/$name" ]]; then
     error "Missing or unreadable package file: $root/$name"; exit 1
   fi
@@ -32,7 +57,7 @@ for target in "$repo" "$links"; do
     error "Installation root is not a directory: $target"; exit 1
   fi
 done
-for name in link.zsh slnk.zsh slnk.conf slnk.conf.example README.md; do
+for name in link.zsh slnk.zsh link_install.zsh slnk.conf slnk.conf.example README.md; do
   if [[ -e "$repo/$name" && ! -f "$repo/$name" ]]; then
     error "Installation entry is not a regular file: $repo/$name"; exit 1
   fi
@@ -77,7 +102,7 @@ install_file() {
     command rm -f -- "$stage"
   }
 }
-for name in link.zsh slnk.zsh README.md; do
+for name in link.zsh slnk.zsh link_install.zsh README.md; do
   install_file "$root/$name" "$repo/$name" || exit 1
 done
 if [[ -e "$repo/slnk.conf" || -L "$repo/slnk.conf" ]]; then
@@ -87,7 +112,7 @@ if [[ -e "$repo/slnk.conf" || -L "$repo/slnk.conf" ]]; then
 else
   install_file "$root/slnk.conf" "$repo/slnk.conf" || exit 1
 fi
-command chmod +x "$repo/link.zsh" "$repo/slnk.zsh" || exit 1
+command chmod +x "$repo/link.zsh" "$repo/slnk.zsh" "$repo/link_install.zsh" || exit 1
 for name in link.zsh slnk.zsh; do
   target="$links/$name"; source_file="$repo/$name"
   [[ -L $target && ${target:A} == ${source_file:A} ]] && continue
@@ -109,4 +134,26 @@ for name in link.zsh slnk.zsh; do
     command rmdir -- "$stage"
   }
 done
+if [[ -n $zshrc_input ]] && ! command cmp -s -- "$zshrc_input" "$zshrc"; then
+  # Stage new contents without touching the symlink; preserve tracked file mode.
+  stage=$(command mktemp "${zshrc:h}/.zshrc-stage.XXXXXXXX") || exit 1
+  {
+    command cp -p -- "$zshrc" "$stage" || exit 1
+    command cat -- "$zshrc_input" > "$stage" || exit 1
+    backup="$HOME/.zshrc.$stamp"; integer suffix=0
+    while [[ -e $backup || -L $backup ]]; do
+      (( suffix += 1 )); backup="$HOME/.zshrc.$stamp.$suffix"
+    done
+    # -n prevents overwriting any existing backup; verify the resulting copy.
+    command cp -p -n -- "$zshrc" "$backup" || exit 1
+    if [[ -L $backup ]] || ! command cmp -s -- "$zshrc" "$backup"; then
+      error "Cannot verify .zshrc backup: $backup"; exit 1
+    fi
+    print -r -- "Backup: $backup"
+    command mv -f -- "$stage" "$zshrc" || exit 1
+    print -r -- "Updated tracked dotfile: $zshrc"
+  } always {
+    command rm -f -- "$stage"
+  }
+fi
 print -r -- "Installed scripts in $repo and links in $links."
