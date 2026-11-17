@@ -1,10 +1,10 @@
 #!/bin/zsh
+# Version: 1.2b
 # Link scripts by configured extensions; never evaluate configuration as code.
-# Version: 1.1
-# This script was generated using GitHub.
 emulate -LR zsh
 setopt NO_UNSET EXTENDED_GLOB
 unsetopt GLOB_DOTS
+readonly SCRIPT_VERSION='1.2b'
 error() { print -ru2 -- "Error: $1"; }
 usage() {
 cat <<'HELP'
@@ -14,6 +14,7 @@ Usage: slnk.zsh [-c CONFIG] [--] SOURCE [SOURCE ...]
 Options:
   -c, --config FILE  Use FILE instead of slnk.conf beside the resolved script.
   -h, --help         Display this help.
+  -v, --version      Display Version 1.2b and exit.
   --                End option parsing.
 Arguments:
   SOURCE            Directory to scan; multiple sources are supported.
@@ -50,6 +51,7 @@ config="${0:A:h}/slnk.conf"
 while (( $# )); do
   case $1 in
     -h|--help) usage; exit 0 ;;
+    -v|--version) print -r -- "slnk.zsh Version $SCRIPT_VERSION"; exit 0 ;;
     -c|--config)
       if (( $# < 2 )) || [[ -z $2 ]]; then error 'Config option requires a file path.'; exit 2; fi
       config=$2; shift 2 ;;
@@ -138,6 +140,17 @@ for language in "${(@k)destinations}"; do
     error "Cannot create destination directory: $dest"; unavailable[$language]=1; failed=1
   fi
 done
+# Reserve source-derived names so a backup never becomes a later link target.
+typeset -A planned_targets
+for source_dir in "${sources[@]}"; do
+  for file in "$source_dir"/*(N.); do
+    extension=${file:e}; extension=${extension:l}
+    (( ${+extension_type[$extension]} )) || continue
+    language=${extension_type[$extension]}
+    planned_target="${destinations[$language]}/${file:t}"
+    planned_targets[$planned_target]=1
+  done
+done
 date_stamp=$(command date +%Y%m%d) || { error 'Cannot determine backup date.'; exit 1; }
 for source_dir in "${sources[@]}"; do
   for file in "$source_dir"/*(N.); do
@@ -162,7 +175,7 @@ for source_dir in "${sources[@]}"; do
       (( created += 1 )); (( updated += 1 )); continue
     elif [[ -f $target ]]; then
       backup="$target.$date_stamp"; integer suffix=0
-      while [[ -e $backup || -L $backup ]]; do
+      while [[ -e $backup || -L $backup ]] || (( ${+planned_targets[$backup]} )); do
         (( suffix += 1 )); backup="$target.$date_stamp.$suffix"
       done
       if ! command mv -n -- "$target" "$backup" || [[ -e $target || -L $target ]]; then
