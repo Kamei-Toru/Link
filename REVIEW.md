@@ -1,74 +1,101 @@
-# Script review — Version 1.2b
+# Review — Version 1.3
 
-## Changes
+## Scope and baseline
 
-| Finding in the previous package | Improvement |
-| --- | --- |
-| Updating a link removed it before creating the replacement | Prepare a temporary link on the same filesystem, then rename it over the existing link; failed preparation or rename preserves the old link |
-| A regular file remained displaced after failed link creation | Attempt to restore its backup when the destination is still absent; report the backup path if restoration fails |
-| Reinstallation replaced custom configuration | Preserve slnk.conf and install defaults as slnk.conf.example |
-| An incomplete installation package could change files before failing | Validate all required payload files and destination entry types before installation |
-| Copy failure could occur after moving the installed file aside | Stage the copy first; attempt restoration after a failed final move |
-| Empty configuration tokens could be lost during splitting | Validate exact separator count, explicit fields, and empty extension tokens |
-| Recursive globbing could silently skip inaccessible source directories | Check source and visible subdirectory access before linking |
-| No reusable regression suite was included | Include 28 standard-library tests, including deliberate ln/mv failures |
+Reviewed the actual Version 1.2b files under ~/Projects/Link, including all three
+zsh scripts and test/test_link_scripts.py. The existing command is slnk.zsh;
+no slink.zsh alias or rename was introduced. Changes were prepared separately;
+the real project, command links, home configuration, and Git history were not
+modified during verification. The scripts now acknowledge ChatGPT assistance.
 
-The original behavior remains: link preserves subdirectory structure and excludes
-hidden descendants; slnk scans directly inside multiple source directories and
-supports configurable languages, missing-source continuation, link updates, and
-dated numbered backups. Real destination directories and special files are never
-replaced by slnk.
+## Findings and applied corrections
 
-## Validation
+1. Language routing was already configuration-driven. Hardcoding new language
+   branches would be unnecessary and risk changing existing behavior. Enabled
+   Swift (swift,swiftmodule,swiftinterface), Ruby (rb,rake), and JavaScript (js,mjs,cjs) in slnk.conf and
+   added the corresponding help examples. Chosen default destinations are
+   ~/Swscripts, ~/Rbscripts, and ~/Jsscripts.
+2. Ruby and JavaScript previously appeared only as commented config examples.
+   Their entries are now active; Swift is a new active entry. Existing Shell,
+   Perl, and Python entries remain unchanged.
+3. The installer deliberately preserves existing slnk.conf. Replacing only
+   scripts would not activate new languages in existing installations. Kept
+   installer behavior unchanged and supplied a separate no-backup placement
+   shell that preserves existing language entries and custom destinations while
+   appending missing Swift, Ruby, and JavaScript entries.
+4. Appending defaults can conflict with extensions already assigned to another
+   language. The placement shell validates the merged configuration before
+   writing; a conflict aborts without silently reassigning extensions. Existing
+   entries for the three language keys remain authoritative.
+5. Updated zsh version comments/constants/help to 1.3; updated test metadata and
+   expected version output, config metadata, README and this review. Added
+   ChatGPT-attribution comments to all zsh scripts and the Python test script.
+6. The requested no-backup policy applies to this placement operation. Removing
+   runtime backup behavior from link, slnk, or the existing installer would be an
+   unspecified behavioral change, so those mechanisms remain unchanged.
 
-- zsh syntax checks for link.zsh, slnk.zsh, and link_install.zsh.
-- 28 regression tests passed on macOS using zsh.
-- Existing integration checks for configurable languages, backup numbering,
-  missing-source continuation, and isolated installation also passed.
-- ZIP integrity and folder layout verified before delivery.
+## Compatibility and observable effects
 
-The GNU/Linux atomic replacement branch is implemented using mv -T but was not
-executed in this macOS environment. Tests can be rerun on GNU/Linux with Python 3
-and zsh. No real user installation files were changed during verification.
+- Existing arguments, options, version-output shape, error messages, summary
+  formats, link handling, backups, exit statuses, and cleanup logic are retained.
+- link.zsh and link_install.zsh differ only in version metadata/help and the
+  attribution comment. Slnk's processing logic is unchanged.
+- The default config now routes three more languages and creates their three
+  destination directories, even with no matching scripts. Existing source/root
+  overlap checks and destination cleanup also apply to these destinations.
+- Explicit custom configs remain explicit: no implicit language defaults are
+  injected by slnk itself. An existing custom language definition is not
+  overwritten by the placement shell.
+- The standard installer still creates dated backups and preserves slnk.conf.
+  The separate placement shell overwrites release files without backups and
+  does not invoke the installer or update .zshrc, PATH, or Git state.
+- The Python regression script retains unittest's CLI; -v remains verbosity.
 
-## Remaining limits
+## Verification performed
 
-These tools assume trusted directories with no concurrent modification. They do
-not lock directories or defend against adversarial path changes. Atomic rename
-protects replacement of an existing link; an entire run is not transactional.
-A crash, power loss, or failed restoration can interrupt regular-file backup or
-installation. Backups are retained for manual recovery. Temporary staging cleanup
-on abrupt process termination is not guaranteed. Slnk uses extensions rather
-than parsing shebangs and does not recurse into source subdirectories.
+- zsh syntax checks passed for link.zsh, slnk.zsh, link_install.zsh and the
+  separate no-backup placement shell.
+- All 33 Python unittest cases passed on macOS: all previous 28 cases plus five
+  new cases for six-language routing with mixed-case extensions, destination
+  creation for empty sources, explicit custom-config isolation, and installer
+  preservation of an old config while supplying the expanded example, and exclusion of Swift module directories.
+- Confirmed metadata-normalized link/install scripts match the actual baseline;
+  Slnk matches after normalizing metadata and its added help examples.
+- Separately executed the placement shell twice under an isolated HOME. Verified
+  custom Shell/Ruby destinations remain, missing language definitions are added
+  only once, command links resolve correctly, and no deployment backups appear.
+- A conflicting extension assignment was rejected before installed script or
+  configuration contents changed.
+- Existing regression coverage includes missing sources, link replacement,
+  dated backups, failed-operation recovery, cleanup, unusual filenames, and
+  tracked .zshrc updates using a temporary HOME.
+
+## Verification not performed and remaining limits
+
+- GNU/Linux execution, alternate zsh releases, and case-insensitive filesystem
+  collision behavior were not tested. The existing GNU mv -T branch is unchanged.
+- Swift, Ruby, and JavaScript programs were not executed. Link creation uses
+  extensions and does not require these language runtimes.
+- No real installation, real .zshrc modification, Git commit, or Git push was
+  performed. The user can run the supplied placement shell to apply the release.
+- Concurrent changes, hostile directory replacement, process termination, power
+  loss and whole-release rollback remain outside the guarantee. Updates are not
+  transactional across files. No-backup deployment is intentionally irreversible
+  without an external copy or Git history.
 
 
-## Broken-link cleanup update
+## Swift extension update (Version 1.3 retained)
 
-Both tools now remove dangling visible symbolic links after a successful link
-phase. Link scans recursively without following directory symlinks; Slnk scans
-each configured destination directly, deduplicating shared destination paths.
-Earlier errors skip cleanup. Cleanup failure sets exit status 1. Tests verify
-scope, hidden-entry exclusion, normal file/link preservation, missing-source
-behavior, and injected unlink failure. Regular dated backups are retained.
-
-
-## Version 1.2b re-review
-
-Reviewed all three zsh scripts after the changes, including failure paths.
-
-| Script | Version 1.2b changes and review |
-| --- | --- |
-| link.zsh | Adds version flags, dated numbered regular-file backups, restoration on link-creation failure, and avoidance of planned link names when choosing backup paths |
-| slnk.zsh | Adds version flags and reserves planned destination names before selecting backups; existing language routing, cleanup and failure behavior retained |
-| link_install.zsh | Renames the installer, adds version flags, installs itself in the repository, preserves configuration, and supports an explicit tracked-dotfile update without replacing the home symlink |
-
-Both version options return before configuration, installation, linking or
-cleanup. The dotfile option is opt-in: default installation leaves .zshrc alone.
-Tests use isolated HOME directories; the actual user's .zshrc was not modified.
-The dotfile backup is a verified regular copy under HOME, not a moved home link.
-Its date/suffix selection handles existing files and dangling symbolic links.
-A staged rename retains the old tracked file on simulated mv failure.
-
-The 28-test suite and syntax checks passed on macOS. GNU/Linux behavior remains
-unexecuted here. Concurrency, abrupt termination and non-transactional multi-file
-updates remain the limitations described above.
+- Added swiftmodule and swiftinterface to Swift configuration and help examples;
+  the linking engine and version are unchanged.
+- Expanded default-routing regression coverage to include both extensions and
+  uppercase forms. Repeated runs still skip the identical links.
+- Confirmed .swiftmodule directories remain excluded, preserving direct regular-
+  file scanning and avoiding an unintended recursive or package-linking change.
+- Corrected placement migration: previously an already-defined Swift entry would
+  be retained without the new extensions. The placement shell now appends only
+  the missing extensions, retaining custom destinations and existing extensions.
+- Verified migration twice under an isolated HOME and rejected conflicting
+  ownership of the added extensions before any installed content changed.
+- Swift compiler execution, binary-module compatibility, and GNU/Linux execution
+  were not tested. These tools only create filesystem links.
