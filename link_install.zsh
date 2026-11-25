@@ -1,16 +1,17 @@
 #!/bin/zsh
-# Version: 1.2b
+# Version: 1.3
+# Created with assistance from ChatGPT.
 # Install the package; preserve user configuration and back up changed files.
 emulate -LR zsh
 setopt NO_UNSET
-readonly SCRIPT_VERSION='1.2b'
+readonly SCRIPT_VERSION='1.3'
 error() { print -ru2 -- "Error: $1"; }
 zshrc_input=
 while (( $# )); do
   case $1 in
     -v|--version) print -r -- "link_install.zsh Version $SCRIPT_VERSION"; exit 0 ;;
     -h|--help)
-      print -r -- 'link_install.zsh — Version 1.2b
+      print -r -- 'link_install.zsh — Version 1.3
 Usage: zsh link_install.zsh [--update-zshrc FILE]
   -h, --help             Display help.
   -v, --version          Display the script version.

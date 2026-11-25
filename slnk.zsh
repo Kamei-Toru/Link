@@ -1,10 +1,11 @@
 #!/bin/zsh
-# Version: 1.2b
+# Version: 1.3
+# Created with assistance from ChatGPT.
 # Link scripts by configured extensions; never evaluate configuration as code.
 emulate -LR zsh
 setopt NO_UNSET EXTENDED_GLOB
 unsetopt GLOB_DOTS
-readonly SCRIPT_VERSION='1.2b'
+readonly SCRIPT_VERSION='1.3'
 error() { print -ru2 -- "Error: $1"; }
 usage() {
 cat <<'HELP'
@@ -14,7 +15,7 @@ Usage: slnk.zsh [-c CONFIG] [--] SOURCE [SOURCE ...]
 Options:
   -c, --config FILE  Use FILE instead of slnk.conf beside the resolved script.
   -h, --help         Display this help.
-  -v, --version      Display Version 1.2b and exit.
+  -v, --version      Display Version 1.3 and exit.
   --                End option parsing.
 Arguments:
   SOURCE            Directory to scan; multiple sources are supported.
@@ -23,7 +24,9 @@ Configuration: LANGUAGE|DESTINATION|COMMA-SEPARATED EXTENSIONS
   shell|~/Shscripts|sh,zsh,bash,ksh,csh,tcsh,fish
   perl|~/Plscripts|pl,pm
   python|~/Pyscripts|py,pyw
+  swift|~/Swscripts|swift,swiftmodule,swiftinterface
   ruby|~/Rbscripts|rb,rake
+  javascript|~/Jsscripts|js,mjs,cjs
 Paths must be absolute or start with ~/. Configuration is data, not shell code.
 All configured destination directories are created, even with no matching files.
 Visible regular files directly inside sources are matched by extension, ignoring

@@ -1,10 +1,11 @@
 #!/bin/zsh
-# Version: 1.2b
+# Version: 1.3
+# Created with assistance from ChatGPT.
 # Mirror visible regular files as symbolic links.
 emulate -LR zsh
 setopt NO_UNSET PIPE_FAIL
 unsetopt GLOB_DOTS
-readonly SCRIPT_VERSION='1.2b'
+readonly SCRIPT_VERSION='1.3'
 usage() {
   cat <<'HELP'
 link.zsh - Link visible source files, preserving subdirectory structure.
@@ -19,7 +20,7 @@ Arguments:
 
 Options:
   -h, --help   Display help and exit.
-  -v, --version  Display Version 1.2b and exit.
+  -v, --version  Display Version 1.3 and exit.
   --           Allow a source path beginning with a dash.
 
 Behavior:

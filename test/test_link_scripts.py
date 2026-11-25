@@ -1,4 +1,5 @@
-# Version: 1.2b
+# Version: 1.3
+# Created with assistance from ChatGPT.
 """Run with: python3 -m unittest discover -s test -v (requires zsh)."""
 from datetime import datetime
 from pathlib import Path
@@ -246,7 +247,7 @@ class ScriptsTest(unittest.TestCase):
         for name in ['link.zsh', 'slnk.zsh', 'link_install.zsh']:
             for option in ['-v', '--version']:
                 result = self.run_script(name, option)
-                self.assertEqual(result.stdout.strip(), f'{name} Version 1.2b')
+                self.assertEqual(result.stdout.strip(), f'{name} Version 1.3')
                 self.assertFalse((self.home / 'Projects').exists())
 
     def test_link_real_file_backup_sequence(self):
@@ -347,6 +348,57 @@ class ScriptsTest(unittest.TestCase):
         self.slnk(self.source)
         self.assertEqual((self.dest / ('file.sh.' + date + '.1')).read_text(), 'original')
         self.assertTrue((self.dest / ('file.sh.' + date)).is_symlink())
+
+    def test_default_config_links_all_six_languages(self):
+        routes = {
+            'shell.sh': 'Shscripts', 'perl.pl': 'Plscripts',
+            'python.py': 'Pyscripts', 'swift.swift': 'Swscripts',
+            'ruby.rb': 'Rbscripts', 'task.rake': 'Rbscripts',
+            'script.js': 'Jsscripts', 'module.mjs': 'Jsscripts',
+            'common.cjs': 'Jsscripts', 'UPPER.SWIFT': 'Swscripts',
+            'UPPER.RB': 'Rbscripts', 'UPPER.JS': 'Jsscripts',
+            'Library.swiftmodule': 'Swscripts', 'Library.swiftinterface': 'Swscripts',
+            'UPPER.SWIFTMODULE': 'Swscripts', 'UPPER.SWIFTINTERFACE': 'Swscripts',
+        }
+        for name in routes:
+            self.write(name)
+        result = self.run_script('slnk.zsh', self.source)
+        self.assertIn(f'{len(routes)} link(s) created', result.stdout)
+        for name, directory in routes.items():
+            self.assertEqual((self.home / directory / name).resolve(), self.source / name)
+        self.assertIn(f'{len(routes)} skipped', self.run_script('slnk.zsh', self.source).stdout)
+
+    def test_default_config_creates_new_destinations_for_empty_source(self):
+        self.run_script('slnk.zsh', self.source)
+        for directory in ['Swscripts', 'Rbscripts', 'Jsscripts']:
+            self.assertTrue((self.home / directory).is_dir())
+
+    def test_explicit_configuration_does_not_implicitly_enable_new_languages(self):
+        self.write('hello.swift')
+        self.write('hello.rb')
+        self.write('hello.js')
+        self.slnk(self.source)
+        self.assertFalse((self.home / 'Swscripts').exists())
+        self.assertFalse((self.home / 'Rbscripts').exists())
+        self.assertFalse((self.home / 'Jsscripts').exists())
+
+    def test_installer_preserves_old_config_and_supplies_new_example(self):
+        self.run_script('link_install.zsh')
+        config = self.home / 'Projects/Link/slnk.conf'
+        config.write_text('shell|~/custom-shell|sh\n')
+        self.run_script('link_install.zsh')
+        self.assertEqual(config.read_text(), 'shell|~/custom-shell|sh\n')
+        example = config.with_name('slnk.conf.example').read_text()
+        for language in ['swift', 'ruby', 'javascript']:
+            self.assertIn(language + '|', example)
+
+    def test_swiftmodule_directory_remains_excluded(self):
+        module = self.source / 'Package.swiftmodule'
+        module.mkdir()
+        (module / 'arm64.swiftmodule').write_text('module data')
+        self.run_script('slnk.zsh', self.source)
+        self.assertFalse((self.home / 'Swscripts/Package.swiftmodule').exists())
+        self.assertFalse((self.home / 'Swscripts/arm64.swiftmodule').exists())
 
 
 if __name__ == '__main__':
